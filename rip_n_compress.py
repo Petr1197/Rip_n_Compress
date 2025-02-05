@@ -9,8 +9,8 @@ from colorama import init, Fore, Style
 from dotenv import load_dotenv
 import psutil
 
-# version 1.0.0
-VERSION = "1.0.0"
+# version 1.0.1
+VERSION = "1.0.1"
 
 # Initialize colorama
 init(autoreset=True)
@@ -38,8 +38,8 @@ HANDBRAKE_PATH = r"C:\Program Files\HandBrake\HandBrakeCLI.exe"
 # Rate limiting: TMDB allows 40 requests every 10 seconds
 REQUEST_DELAY = 0.25  # Delay between API requests (in seconds)
 
-# Tolerance for file size differences (5%)
-FILE_SIZE_TOLERANCE = 0.05
+# Tolerance for file size differences (10%)
+FILE_SIZE_TOLERANCE = 0.1
 
 # Global variable to control pausing
 paused = False
@@ -79,6 +79,9 @@ def auto_pause(program_names):
 
 def search_movie(title):
     """Search for a movie by title using the TMDB API."""
+    # Remove underscores and text after an underscore
+    title = title.split('_')[0].replace('_', ' ')
+    
     endpoint = f"{TMDB_API_URL}/search/movie"
     params = {
         "api_key": TMDB_API_KEY,
@@ -111,20 +114,20 @@ def search_tv_show(title):
         print(Fore.RED + f"Error searching for TV show '{title}': {e}")
         return None
 
-def get_media_details(media_type, media_id):
-    """Get detailed metadata for a movie or TV show by its TMDB ID."""
+def get_media_title(media_type, media_id):
+    """Get the title of a movie or TV show by its TMDB ID."""
     endpoint = f"{TMDB_API_URL}/{media_type}/{media_id}"
     params = {
-        "api_key": TMDB_API_KEY,
-        "append_to_response": "credits,videos"  # Optional: Add more details
+        "api_key": TMDB_API_KEY
     }
     try:
         response = requests.get(endpoint, params=params)
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        return data.get("title" if media_type == "movie" else "name", "Unknown")
     except requests.exceptions.RequestException as e:
-        print(Fore.RED + f"Error fetching details for {media_type} ID {media_id}: {e}")
-        return None
+        print(Fore.RED + f"Error fetching title for {media_type} ID {media_id}: {e}")
+        return "Unknown"
 
 def rename_media_file(file_path, metadata, media_type, output_dir=None):
     """
@@ -180,18 +183,13 @@ def rip_movie(output_dir):
         
         # Monitor the staging folder for progress
         with tqdm(total=100, desc="Ripping Progress", unit="%") as pbar:
-            while process.poll() is None:
+            for line in iter(process.stdout.readline, ''):
                 auto_pause(TARGET_PROGRAMS)
                 if paused:
                     print(Fore.YELLOW + "Process paused. Press Ctrl+P to resume.")
                     while paused:
                         time.sleep(1)
-                
-                # Calculate progress based on the size of files in the output directory
-                total_size = sum(os.path.getsize(os.path.join(output_dir, f)) for f in os.listdir(output_dir) if f.endswith(".mkv"))
-                pbar.n = total_size / (1024 * 1024)  # Convert to MB
-                pbar.refresh()
-                time.sleep(1)  # Adjust the sleep time as needed
+                print(line.strip())
 
             # Ensure the progress bar is complete
             pbar.n = pbar.total
@@ -315,8 +313,8 @@ def main():
     main_movie_title = os.path.splitext(main_file)[0]  # Use the filename as the title
     print(Fore.CYAN + f"Main movie file: {main_file}")
 
-    # Step 3: Fetch movie details from TMDB
-    print(Fore.CYAN + "Fetching movie details from TMDB...")
+    # Step 3: Fetch movie title from TMDB
+    print(Fore.CYAN + "Fetching movie title from TMDB...")
     movie_details = search_movie(main_movie_title)
     if not movie_details:
         print(Fore.RED + f"Could not find details for movie: {main_movie_title}. Trying TV show search.")
@@ -325,14 +323,12 @@ def main():
             print(Fore.RED + f"Could not find details for TV show: {main_movie_title}")
             return
 
-    # Extract title and release year from the TMDB response
+    # Extract title from the TMDB response
     title = movie_details.get("title" if "title" in movie_details else "name", "Unknown")
-    release_year = movie_details.get("release_date" if "release_date" in movie_details else "first_air_date", "").split("-")[0]
-    movie_folder_name = f"{title} ({release_year})" if release_year else title
-    print(Fore.CYAN + f"Movie folder name: {movie_folder_name}")
+    print(Fore.CYAN + f"Movie title: {title}")
 
-    # Create a folder named after the TMDB title and release year
-    movie_folder = os.path.join(BASE_OUTPUT_DIR, movie_folder_name)
+    # Create a folder named after the TMDB title
+    movie_folder = os.path.join(BASE_OUTPUT_DIR, title)
     os.makedirs(movie_folder, exist_ok=True)
     print(Fore.CYAN + f"Created movie folder: {movie_folder}")
 
