@@ -320,14 +320,16 @@ def main():
         print(Fore.RED + f"Could not find details for movie: {main_movie_title}. Trying TV show search.")
         movie_details = search_tv_show(main_movie_title)
         if not movie_details:
-            print(Fore.RED + f"Could not find details for TV show: {main_movie_title}")
-            return
+            print(Fore.RED + f"Could not find details for TV show: {main_movie_title}. Using original file title.")
+            title = main_movie_title
+        else:
+            title = movie_details.get("name", main_movie_title)
+    else:
+        title = movie_details.get("title", main_movie_title)
 
-    # Extract title from the TMDB response
-    title = movie_details.get("title" if "title" in movie_details else "name", "Unknown")
     print(Fore.CYAN + f"Movie title: {title}")
 
-    # Create a folder named after the TMDB title
+    # Create a folder named after the TMDB title or original file title
     movie_folder = os.path.join(BASE_OUTPUT_DIR, title)
     os.makedirs(movie_folder, exist_ok=True)
     print(Fore.CYAN + f"Created movie folder: {movie_folder}")
