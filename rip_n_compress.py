@@ -7,6 +7,7 @@ from tqdm import tqdm
 import keyboard
 from colorama import init, Fore, Style
 from dotenv import load_dotenv
+import psutil
 
 # version 1.0.0
 VERSION = "1.0.0"
@@ -43,6 +44,9 @@ FILE_SIZE_TOLERANCE = 0.05
 # Global variable to control pausing
 paused = False
 
+# List of target programs to monitor for auto-pausing
+TARGET_PROGRAMS = ["cs2.exe"]  # Add more program names as needed
+
 def toggle_pause():
     global paused
     paused = not paused
@@ -53,6 +57,25 @@ def toggle_pause():
 
 # Register key listeners
 keyboard.add_hotkey('ctrl+p', toggle_pause)
+
+def check_for_programs(program_names):
+    """Check if any of the specified programs are running."""
+    for proc in psutil.process_iter(['name']):
+        if proc.info['name'] in program_names:
+            return True
+    return False
+
+def auto_pause(program_names):
+    """Automatically pause the script if any of the specified programs are running."""
+    global paused
+    if check_for_programs(program_names):
+        if not paused:
+            paused = True
+            print(Fore.YELLOW + f"\nPausing process because one of the target programs is running...")
+    else:
+        if paused:
+            paused = False
+            print(Fore.GREEN + f"\nResuming process because none of the target programs are running...")
 
 def search_movie(title):
     """Search for a movie by title using the TMDB API."""
@@ -158,6 +181,7 @@ def rip_movie(output_dir):
         # Monitor the staging folder for progress
         with tqdm(total=100, desc="Ripping Progress", unit="%") as pbar:
             while process.poll() is None:
+                auto_pause(TARGET_PROGRAMS)
                 if paused:
                     print(Fore.YELLOW + "Process paused. Press Ctrl+P to resume.")
                     while paused:
@@ -196,6 +220,7 @@ def compress_movie(input_file, output_file):
         with tqdm(total=100, desc="Compression Progress", unit="%") as pbar:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, bufsize=1)
             for line in iter(process.stdout.readline, ''):
+                auto_pause(TARGET_PROGRAMS)
                 if paused:
                     print(Fore.YELLOW + "Process paused. Press Ctrl+P to resume.")
                     while paused:
