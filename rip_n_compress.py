@@ -8,6 +8,9 @@ import keyboard
 from colorama import init, Fore, Style
 from dotenv import load_dotenv
 
+# version 1.0.0
+VERSION = "1.0.0"
+
 # Initialize colorama
 init(autoreset=True)
 
@@ -264,6 +267,7 @@ def process_media_directory(staging_dir, movie_folder):
         compress_movie(new_file_path, compressed_file)
 
 def main():
+    print(Fore.LIGHTRED_EX + f"Rip N' Compress v{VERSION}")
     # Create the staging directory
     os.makedirs(STAGING_DIR, exist_ok=True)
     print(Fore.CYAN + f"Created staging directory: {STAGING_DIR}")
